@@ -20,5 +20,5 @@ from django.urls import path, include
 urlpatterns = [
     path('admin/', admin.site.urls),
     
-    path('api/', include('api.urls')) # Forward any api URL to the app's urls.py
+    path('api/', include('h2hapi.urls')) # Forward any api URL to the app's urls.py
 ]

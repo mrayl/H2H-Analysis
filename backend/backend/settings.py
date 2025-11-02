@@ -40,7 +40,7 @@ INSTALLED_APPS = [
     
     'rest_framework',
     'corsheaders',
-    'api.apps.ApiConfig',
+    'h2hapi.apps.H2HapiConfig',
 ]
 
 MIDDLEWARE = [
