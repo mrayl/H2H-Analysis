@@ -10,3 +10,11 @@ As a **Fantasy Basketball Manager,** I want to **view a seperate Head-to-Head st
 
 As a **Sports debater,** I want to **view stats from a specific season** So i can **compare a player's stats from different years (rookie season vs. MVP season)**
 - **Acceptance Criteria:** The stats tables clearly display which season is being shown.
+
+## Misuser Stories
+
+As an **Attacker,** I want to **Pass malicious input into the parameters** so i can **corrupt the database**
+- **Mitigation Criteria:** The backend validates all incoming parameters
+ 
+As a **Malicious User,** I want to **spam the "Compare" button** so I can **trigger a DoS by overloading the backend**
+- **Mitigation Criteria:** The Compare button is disabled after being clicked, preventing multiple submissions
