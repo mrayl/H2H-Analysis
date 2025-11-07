@@ -12,8 +12,9 @@ import requests
 # Create your views here.
 from nba_api.stats.endpoints import leaguedashplayerstats
 from nba_api.stats.endpoints import playergamelog
+from nba_api.stats.endpoints import playercareerstats
 
-CURRENT_SEASON = "2024-2025"
+CURRENT_SEASON = "2025-26"
 
 class PlayerListView(ListAPIView):
     # Lists all active players for the search box
@@ -35,16 +36,32 @@ class ComparePlayersView(APIView):
             
         season = request.query_params.get('season', CURRENT_SEASON)
         
-        print(f"Comparing {player_a_id} vs {player_b_id} for {season}")
+        if len(season) == 9 and season[4] =='-':
+            formatted_season = season[:5] + season[-2:] # Format the season from 2024-2025 to 2024-25
+        else:
+            formatted_season = season
+        
+        print(f"Comparing {player_a_id} vs {player_b_id} for {formatted_season}")
         
         try:
             
            # Get Season Stats
             print(f"Fetching season stats for Player A ({player_a_id})...")
-            season_stats_a = self.get_season_stats(player_a_id, season)
+            season_stats_a = self.get_season_stats(player_a_id, formatted_season)
             
             print(f"Fetching season stats for Player B ({player_b_id})...")
-            season_stats_b = self.get_season_stats(player_b_id, season)
+            season_stats_b = self.get_season_stats(player_b_id, formatted_season)
+            
+            # Get Gamelogs
+            print(f"Fetching full gamelog for Player A ({player_a_id})...")
+            gamelog_a = self.get_player_gamelog(player_a_id, formatted_season)
+            
+            print(f"Fetching full gamelog for Player B ({player_b_id})...")
+            gamelog_b = self.get_player_gamelog(player_b_id, formatted_season)
+            
+            # Compute H2H Stats
+            print("Computing H2H stats...")
+            h2h_stats = self.compute_h2h_stats(gamelog_a, gamelog_b)
 
             # Get player details
             details_a = self.get_player_details(player_a_id)
@@ -54,7 +71,7 @@ class ComparePlayersView(APIView):
             response_data = {
                 "player_a_id": player_a_id,
                 "player_b_id": player_b_id,
-                "season": season,
+                "season": formatted_season,
                 "player_a_details": {
                     **details_a, 
                     "team_id": season_stats_a.get("team_id"),
@@ -69,7 +86,7 @@ class ComparePlayersView(APIView):
                     "player_a": season_stats_a,
                     "player_b": season_stats_b,
                 }, 
-                "h2h_stats": {} # We will do H2H next
+                "h2h_stats": h2h_stats # We will do H2H next
             }
             
             # Update Dictionary for Player A
@@ -91,8 +108,6 @@ class ComparePlayersView(APIView):
 
             if update_data_b:
                 Player.objects.filter(api_id=player_b_id).update(**update_data_b)
-
-            # H2H Logic will go here
             
             print("All data fetched successfully")
             return Response(response_data, status=200)
@@ -117,32 +132,28 @@ class ComparePlayersView(APIView):
     
     def get_season_stats(self, player_id, season):
         
-        print(f"Fetching LeagueDashPlayerStats for {player_id} in {season}...")
+        print(f"Fetching Fetching PlayerCareerStats for {player_id} in {season}...")
         time.sleep(1.1) 
         
         try:
             # API Call
-            stats_endpoint = leaguedashplayerstats.LeagueDashPlayerStats(
-                season=season,
-                Player_ID_Nullable=player_id,
-                season_type_all_star="Regular Season"
+            career_stats_endpoint = playercareerstats.PlayerCareerStats(
+                player_id=player_id,
             )
             
-            stats_dict = stats_endpoint.get_dict()
-
-            if 'resultSets' not in stats_dict or not stats_dict['resultSets']:
-                raise Exception("API Response missing 'resultSets'")
-
-            data = stats_dict['resultSets'][0]
-            headers = data['headers']
-            rows = data['rowSet']
+            stats_df = career_stats_endpoint.get_data_frames()[0]
             
-            if not rows:
-                # Player had no stats for this season (e.g., injured)
-                return {"game_count": 0}
+            if stats_df.empty:
+                return {"game_count": 0, "error": "No career stats found for player."}
 
-            stats_df = pd.DataFrame(rows, columns=headers)
-            total_stats = stats_df.iloc[0]
+            season_stats_series = stats_df[stats_df['SEASON_ID'] == season]
+            
+            if season_stats_series.empty:
+                # Player had no stats for this season (e.g., injured, not in league)
+                return {"game_count": 0, "error": "No stats found for this season."}
+
+            # Get the first (and only) row for that season
+            total_stats = season_stats_series.iloc[0]
 
             # Calculate Advanced Stats
             try:
@@ -167,7 +178,10 @@ class ComparePlayersView(APIView):
             for col in avg_cols:
                 # Ensure data is numeric before dividing
                 total = pd.to_numeric(total_stats[col])
-                avg = total / game_count
+                if game_count == 0:
+                    avg = 0
+                else:
+                    avg = total / game_count
                 avg_stats[col] = round(avg, 1)
 
             # Return the data
@@ -185,6 +199,90 @@ class ComparePlayersView(APIView):
 
         except Exception as e:
             print(f"Error in get_season_stats for {player_id}: {e}")
-            # This could be a 'resultSet' error if the player played for
-            # no teams that season.
+            # This could be a 'resultSet' error
             return {"game_count": 0, "error": str(e)}
+        
+    def get_player_gamelog(self, player_id, season):
+        # Fetches full gamelog for a player in a given season
+        print(f"Fetching GameLog for {player_id} in {season}...")
+        time.sleep(1.1)
+        
+        try:
+            gamelog_endpoint = playergamelog.PlayerGameLog(
+                player_id=player_id,
+                season=season,
+                season_type_all_star="Regular Season"
+            )
+            
+            return gamelog_endpoint.get_data_frames()[0]
+        except Exception as e:
+            print(f"Errir fetching gamelog for {player_id}: {e}")
+            return pd.DataFrame()
+        
+    def compute_h2h_stats(self, gamelog_a, gamelog_b):
+        # Calculates H2H Stats by finding common games within 2 provided gamelogs
+        
+        empty_stats = {"game_count": 0, "error": "No H2H Games Found."}
+        
+        if gamelog_a.empty or gamelog_b.empty:
+            return {"player:a": empty_stats, "player_b": empty_stats}
+        
+        # Find Common Game_ID's
+        common_game_ids = pd.merge(gamelog_a, gamelog_b, on='Game_ID', suffixes=('_a', '_b'))['Game_ID']
+        
+        if common_game_ids.empty:
+            return {"player_a": empty_stats, "player_b": empty_stats}
+        
+        # Filter Gamelogs for just the H2H Games
+        h2h_games_a = gamelog_a[gamelog_a['Game_ID'].isin(common_game_ids)]
+        h2h_games_b = gamelog_b[gamelog_b['Game_ID'].isin(common_game_ids)]
+        
+        # Aggregate stats for each player
+        stats_a = self.aggregate_stats_from_df(h2h_games_a)
+        stats_b = self.aggregate_stats_from_df(h2h_games_b)
+        
+        return {"player_a": stats_a, "player_b": stats_b}
+    
+    def aggregate_stats_from_df(self, stats_df):
+        
+        if stats_df.empty:
+            return {"game_count": 0, "error": "No games to aggregate."}
+        
+        game_count = len(stats_df)
+        total_stats = stats_df.sum(numeric_only=True)
+        
+        # Calculate Advanced Stats
+        try:
+            efg_pct = (total_stats['FGM'] + 0.5 * total_stats['FG3M']) / total_stats['FGA']
+        except ZeroDivisionError:
+            efg_pct = 0
+            
+        try:
+            tsp_pct = total_stats['PTS'] / (2 * (total_stats['FGA'] + 0.44 * total_stats['FTA']))
+        except ZeroDivisionError:
+            tsp_pct = 0
+            
+        # Calculate Averages
+        avg_cols = [
+            'MIN', 'FGM', 'FGA', 'FG3M', 'FG3A', 'FTM', 
+            'FTA', 'OREB', 'DREB', 'REB', 'AST', 'STL', 
+            'BLK', 'TOV', 'PF', 'PTS'
+        ]
+        avg_stats = {}
+        for col in avg_cols:
+            total = pd.to_numeric(total_stats[col])
+            if game_count == 0:
+                avg = 0
+            else:
+                avg = total / game_count
+            avg_stats[col] = round(avg, 1)
+            
+        return {
+            "game_count": int(game_count),
+            "avg_stats": avg_stats,
+            "advanced_stats": {
+                "efg_pct": round(efg_pct, 3),
+                "tsp_pct": round(tsp_pct, 3),
+            },
+            "total_stats": total_stats.to_dict()
+        }
