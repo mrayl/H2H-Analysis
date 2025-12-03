@@ -1,42 +1,189 @@
-#root {
-  max-width: 1280px;
+:root {
+  --primary-bg: #1a1a1a;
+  --secondary-bg: #2a2a2a;
+  --accent-color: #f39c12; /* Basketball Orange */
+  --text-color: #f0f0f0;
+  --winner-color: #2ecc71;
+  --border-color: #444;
+}
+
+body {
+  margin: 0;
+  background-color: var(--primary-bg);
+  color: var(--text-color);
+  font-family: 'Inter', system-ui, Avenir, Helvetica, Arial, sans-serif;
+}
+
+.container {
+  max-width: 1200px;
   margin: 0 auto;
   padding: 2rem;
   text-align: center;
 }
 
-.logo {
-  height: 6em;
-  padding: 1.5em;
-  will-change: filter;
-  transition: filter 300ms;
-}
-.logo:hover {
-  filter: drop-shadow(0 0 2em #646cffaa);
-}
-.logo.react:hover {
-  filter: drop-shadow(0 0 2em #61dafbaa);
+/* Header */
+.app-header h1 {
+  font-size: 2.5rem;
+  margin-bottom: 0.5rem;
+  color: var(--accent-color);
 }
 
-@keyframes logo-spin {
-  from {
-    transform: rotate(0deg);
-  }
-  to {
-    transform: rotate(360deg);
-  }
+.app-header p {
+  color: #aaa;
+  margin-bottom: 2rem;
 }
 
-@media (prefers-reduced-motion: no-preference) {
-  a:nth-of-type(2) .logo {
-    animation: logo-spin infinite 20s linear;
-  }
+/* Controls */
+.controls-container {
+  background-color: var(--secondary-bg);
+  padding: 1.5rem;
+  border-radius: 8px;
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 1.5rem;
+  align-items: flex-end;
+  box-shadow: 0 4px 6px rgba(0,0,0,0.3);
 }
 
-.card {
-  padding: 2em;
+.control-group {
+  display: flex;
+  flex-direction: column;
+  text-align: left;
 }
 
-.read-the-docs {
-  color: #888;
+.control-group label {
+  font-size: 0.9rem;
+  margin-bottom: 0.5rem;
+  color: #bbb;
+}
+
+select, input {
+  padding: 0.8rem;
+  border-radius: 4px;
+  border: 1px solid var(--border-color);
+  background-color: #333;
+  color: white;
+  font-size: 1rem;
+  min-width: 200px;
+}
+
+.compare-btn {
+  padding: 0.8rem 2rem;
+  background-color: var(--accent-color);
+  color: #fff;
+  border: none;
+  border-radius: 4px;
+  font-size: 1rem;
+  font-weight: bold;
+  cursor: pointer;
+  transition: background-color 0.2s;
+  height: 46px; /* Match input height */
+}
+
+.compare-btn:hover {
+  background-color: #d35400;
+}
+
+.compare-btn:disabled {
+  background-color: #555;
+  cursor: not-allowed;
+}
+
+/* Error */
+.error-message {
+  margin-top: 1rem;
+  color: #e74c3c;
+  background: rgba(231, 76, 60, 0.1);
+  padding: 1rem;
+  border-radius: 4px;
+}
+
+/* Results */
+.results-container {
+  margin-top: 2rem;
+  animation: fadeIn 0.5s ease-in;
+}
+
+.comparison-title {
+  font-size: 2rem;
+  margin-bottom: 0.5rem;
+}
+
+.vs {
+  color: #777;
+  font-size: 1.5rem;
+  margin: 0 10px;
+}
+
+.season-subtitle {
+  color: var(--accent-color);
+  font-weight: bold;
+  margin-bottom: 2rem;
+}
+
+.tables-wrapper {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 2rem;
+}
+
+/* Stats Table Component */
+.stats-table-container {
+  flex: 1;
+  min-width: 350px;
+  background-color: var(--secondary-bg);
+  border-radius: 8px;
+  padding: 1rem;
+  box-shadow: 0 4px 6px rgba(0,0,0,0.3);
+}
+
+.stats-table-container h3 {
+  border-bottom: 2px solid var(--border-color);
+  padding-bottom: 0.5rem;
+  margin-bottom: 1rem;
+  color: #ddd;
+}
+
+.stats-table {
+  width: 100%;
+  border-collapse: collapse;
+}
+
+.stats-table th, .stats-table td {
+  padding: 0.8rem;
+  text-align: center;
+  border-bottom: 1px solid var(--border-color);
+}
+
+.stats-table th {
+  color: #aaa;
+  font-weight: 600;
+  text-transform: uppercase;
+  font-size: 0.85rem;
+}
+
+.stat-label {
+  text-align: left !important;
+  font-weight: bold;
+  color: var(--accent-color);
+}
+
+.section-header {
+    background-color: #333;
+    font-weight: bold;
+    text-transform: uppercase;
+    font-size: 0.8rem;
+    letter-spacing: 1px;
+}
+
+.winner {
+  color: var(--winner-color);
+  font-weight: bold;
+}
+
+@keyframes fadeIn {
+  from { opacity: 0; transform: translateY(10px); }
+  to { opacity: 1; transform: translateY(0); }
 }
