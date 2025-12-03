@@ -2,8 +2,10 @@ from django.shortcuts import render
 from rest_framework.generics import ListAPIView
 from rest_framework.views import APIView
 from rest_framework.response import Response
+from rest_framework.permissions import AllowAny, IsAuthenticatedOrReadOnly
+from rest_framework.authentication import SessionAuthentication, BasicAuthentication
 from .models import Player
-from .serializers import PlayerSerializer
+from .serializers import PlayerSerializer, ComparisonRequestSerializer
 import time
 import pandas as pd
 import json
@@ -19,27 +21,34 @@ CURRENT_SEASON = "2025-26"
 class PlayerListView(ListAPIView):
     # Lists all active players for the search box
     
+    permission_classes = [IsAuthenticatedOrReadOnly]
+    
     queryset = Player.objects.all().order_by('last_name') # Gets all players from the database
     serializer_class = PlayerSerializer
 
 class ComparePlayersView(APIView):
+    
+    authentication_classes = [SessionAuthentication, BasicAuthentication]
+    permission_classes = [AllowAny]
+    
     def get(self, request, *args, **kwargs):
-        # Get Player Ids
-        try:
-            player_a_id = int(request.query_params.get('player_a_id'))
-            player_b_id = int(request.query_params.get('player_b_id'))
-        except (TypeError, ValueError):
-            return Response(
-                {"error": "Invalid player IDs. Please provide two valid integers."},
-                status=400
-            )
-            
-        season = request.query_params.get('season', CURRENT_SEASON)
         
-        if len(season) == 9 and season[4] =='-':
-            formatted_season = season[:5] + season[-2:] # Format the season from 2024-2025 to 2024-25
+        serializer = ComparisonRequestSerializer(data=request.query_params)
+        
+        if not serializer.is_valid():
+            return Response({"error": serializer.errors}, status=400)
+        
+        validated_data = serializer.validated_data
+        player_a_id = validated_data['player_a_id']
+        player_b_id = validated_data['player_b_id']
+        raw_season = validated_data['season']
+        
+        
+        # Format the season
+        if len(raw_season) == 9 and raw_season[4] =='-':
+            formatted_season = raw_season[:5] + raw_season[-2:] # Format the season from 2024-2025 to 2024-25
         else:
-            formatted_season = season
+            formatted_season = raw_season
         
         print(f"Comparing {player_a_id} vs {player_b_id} for {formatted_season}")
         
@@ -120,7 +129,7 @@ class ComparePlayersView(APIView):
             )
             
     def get_player_details(self, player_id):
-        # Helper Function - gets players' names and teams
+        # gets players' names and teams
         try:
             player = Player.objects.get(api_id=player_id)
             return {
@@ -216,7 +225,7 @@ class ComparePlayersView(APIView):
             
             return gamelog_endpoint.get_data_frames()[0]
         except Exception as e:
-            print(f"Errir fetching gamelog for {player_id}: {e}")
+            print(f"Error fetching gamelog for {player_id}: {e}")
             return pd.DataFrame()
         
     def compute_h2h_stats(self, gamelog_a, gamelog_b):
